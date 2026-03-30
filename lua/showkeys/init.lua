@@ -1,3 +1,4 @@
+
 local M = {}
 local api = vim.api
 
@@ -16,7 +17,9 @@ M.open = function()
   utils.gen_winconfig()
   vim.bo[state.buf].ft = "Showkeys"
 
-  state.timer = vim.loop.new_timer()
+  state.timer = vim.uv.new_timer()
+  state.timer_id = 0
+
   state.on_key = vim.on_key(function(_, char)
     if not state.win then
       state.win = api.nvim_open_win(state.buf, false, state.config.winopts)
@@ -25,8 +28,15 @@ M.open = function()
 
     utils.parse_key(char)
 
+    state.timer_id = state.timer_id + 1
+    local current_id = state.timer_id
+
     state.timer:stop()
-    state.timer:start(state.config.timeout * 1000, 0, vim.schedule_wrap(utils.clear_and_close))
+    state.timer:start(state.config.timeout * 1000, 0, vim.schedule_wrap(function ()
+      if state.timer_id ~= current_id then return end
+      state.timer_id = 0
+      utils.clear_and_close()
+    end))
   end)
 
   api.nvim_set_hl(0, "SkInactive", { default = true, link = "Visual" })
